@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+🎬 Video Splicer App (Next.js + Shotstack)
 
-## Getting Started
+This is a full-stack video splicing app built with Next.js, AWS S3, and Shotstack's video rendering API. It allows users to:
 
-First, run the development server:
+Upload a main video and a clip
 
-```bash
+Specify a start and end timestamp
+
+Splice the clip into the main video at the defined interval
+
+Automatically render and return the final video from Shotstack
+
+🚀 Features
+
+Drag-and-drop file upload UI with animated feedback
+
+Uploads videos to S3
+
+Sends a structured timeline payload to Shotstack's /render API
+
+Polls for render status and displays a final download link
+
+Cleans up temporary files
+
+🛠️ Getting Started
+
+1. Clone the Repo
+
+git clone https://github.com/YOUR_USERNAME/video-splicer.git
+cd video-splicer
+
+2. Install Dependencies
+
+npm install
+
+3. Environment Variables
+
+Create a .env.local file:
+
+AWS_REGION=us-east-2
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_S3_BUCKET=your-bucket-name
+
+SHOTSTACK_DEV_API_KEY=your-sandbox-api-key
+
+✅ Do not check in .env.local to GitHub.
+
+📁 Folder Structure
+
+/pages
+  /api
+    splice-videos.ts         # Handles uploads and Shotstack integration
+/lib
+  s3Uploader.ts              # S3 upload and delete utilities
+/styles
+  globals.css                # TailwindCSS styles
+
+🧪 Testing
+
+Start local dev server:
+
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open http://localhost:3000 to access the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+✅ To Do / Optional Enhancements
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Add render status page
 
-## Learn More
+Retry mechanism if polling fails
 
-To learn more about Next.js, take a look at the following resources:
+User auth or signed uploads
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Real-time render progress bar (Shotstack webhook optional)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+🛡 Security Note
 
-## Deploy on Vercel
+This repo does not commit any credentials. Your .env.local should never be pushed. Use GitHub secrets for production deployments.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+📄 License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT — feel free to fork, modify, and build upon it.
