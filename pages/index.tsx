@@ -20,6 +20,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
 
   const fileLimitMB = 200;
+  const [resolution, setResolution] = useState("mobile");
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, setter: (file: File | null) => void) => {
     e.preventDefault();
@@ -44,6 +45,7 @@ export default function Home() {
     formData.append("clipVideo", clipVideo);
     formData.append("startTimestamp", startTimestamp);
     formData.append("endTimestamp", endTimestamp);
+    formData.append("resolution", resolution);
 
     try {
       const res = await fetch("/api/splice-videos", {
@@ -133,6 +135,16 @@ export default function Home() {
               className="bg-white border border-[#C5D143] text-black p-4 rounded w-full"
             />
 
+            <select
+              value={resolution}
+              onChange={(e) => setResolution(e.target.value)}
+              className="bg-white border border-[#C5D143] text-black p-4 rounded w-full mb-6"
+            >
+              <option value="mobile">9:16 (Mobile Portrait)</option>
+              <option value="hd">16:9 (HD Landscape)</option>
+              <option value="square">1:1 (Square)</option>
+            </select>
+
             <button
               onClick={handleSubmit}
               disabled={status === "loading"}
@@ -162,8 +174,28 @@ export default function Home() {
           <div className="mt-8 text-center">
             <div className="bg-white/20 p-6 rounded-xl">
               <Lottie animationData={successAnimation} className="w-48 mx-auto" loop={false} />
-              <video src={outputUrl} controls width="100%" className="mt-6 rounded-xl" />
-              <a href={outputUrl} download target="_blank" className="text-[#EF2850] underline block mt-4">
+
+              <div
+                className={`
+                  mx-auto mt-6 rounded-xl overflow-hidden
+                  ${resolution === "mobile" ? "aspect-[9/16]" : ""}
+                  ${resolution === "square" ? "aspect-square" : ""}
+                  ${resolution === "hd" ? "aspect-video" : ""}
+                `}
+              >
+                <video
+                  src={outputUrl}
+                  controls
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              <a
+                href={outputUrl}
+                download
+                target="_blank"
+                className="text-[#EF2850] underline block mt-4"
+              >
                 ⬇️ Download or View Final Video
               </a>
             </div>

@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4.1.6",
+    "@types/fluent-ffmpeg": "^2.1.27",
     "@types/formidable": "^3.4.5",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -30,7 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
     "postcss": "^8.5.3",
-    "tailwindcss": "^4.1.6",
+    "tailwindcss": "^3.4.1",
     "typescript": "^5"
   }
 }
