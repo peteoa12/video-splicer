@@ -162,16 +162,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const result = await response.json();
       console.log("📦 Shotstack API Response:", JSON.stringify(result, null, 2));
 
-      // Clean up
-      const allFiles = [
-        mainVideo.filepath,
-        clipVideo.filepath,
-        beforePath,
-        afterPath
-      ];
-      await Promise.all(
-        allFiles.map(file => fsSync.existsSync(file) && fs.unlink(file))
-      );
+      // Clean up everything in /tmp
+      try {
+        const tmpDir = path.join(process.cwd(), "tmp");
+        const files = await fs.readdir(tmpDir);
+        await Promise.all(files.map(file => fs.unlink(path.join(tmpDir, file))));
+        console.log("🧹 Cleaned up /tmp folder");
+      } catch (cleanupErr) {
+        console.warn("⚠️ TMP cleanup error:", cleanupErr);
+      }
 
       if (!response.ok || !result?.response?.id) {
         return res.status(500).json({ error: "Video rendering failed", shotstackResponse: result });

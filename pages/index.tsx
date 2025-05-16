@@ -1,7 +1,6 @@
-// pages/index.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
@@ -18,18 +17,14 @@ export default function Home() {
   const [outputUrl, setOutputUrl] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [progress, setProgress] = useState(0);
-
-  const fileLimitMB = 200;
   const [resolution, setResolution] = useState("mobile");
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, setter: (file: File | null) => void) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && file.size / 1024 / 1024 <= fileLimitMB) {
-      setter(file);
-    } else {
-      alert(`File must be smaller than ${fileLimitMB}MB.`);
-    }
+  const fileLimitMB = 200;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (file: File | null) => void) => {
+    const file = e.target.files?.[0];
+    if (file && file.size / 1024 / 1024 <= fileLimitMB) setter(file);
+    else alert(`File must be smaller than ${fileLimitMB}MB.`);
   };
 
   const handleSubmit = async () => {
@@ -40,6 +35,7 @@ export default function Home() {
 
     setStatus("loading");
     setProgress(0);
+
     const formData = new FormData();
     formData.append("mainVideo", mainVideo);
     formData.append("clipVideo", clipVideo);
@@ -53,9 +49,7 @@ export default function Home() {
         body: formData,
       });
 
-      const text = await res.text();
-      const data = JSON.parse(text);
-
+      const data = await res.json();
       if (data.id) {
         let attempts = 0;
         const maxAttempts = 30;
@@ -71,11 +65,8 @@ export default function Home() {
             setStatus("error");
           } else {
             setProgress(Math.min(100, Math.floor((attempts / maxAttempts) * 100)));
-            if (++attempts <= maxAttempts) {
-              setTimeout(poll, 2000);
-            } else {
-              setStatus("error");
-            }
+            if (++attempts <= maxAttempts) setTimeout(poll, 2000);
+            else setStatus("error");
           }
         };
 
@@ -91,31 +82,19 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-[#EF2850] px-4 flex items-center justify-center">
-      <div className="w-full max-w-xl mx-auto bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-xl">
-        <h1 className="text-3xl font-extrabold mb-8 text-center">⚡ Splice Your Videos</h1>
+    <div className="font-sans min-h-screen relative overflow-hidden text-white px-4 py-10 flex items-center justify-center">
+      <div className="absolute inset-0 z-0 animate-[backgroundMove_30s_linear_infinite] bg-gradient-to-br from-black via-gray-900 to-black bg-[length:400%_400%]" />
 
-        {status === "idle" && (
-          <div className="space-y-6">
+      <div className="relative z-10 w-full max-w-2xl rounded-3xl bg-white/10 backdrop-blur-xl shadow-[0_0_60px_rgba(255,255,255,0.05)] p-8">
+        <h1 className="text-4xl font-extrabold text-[#EF2850] text-center mb-8 tracking-tight">VIDEO SPLICER</h1>
+
+        {(status === "idle" || status === "error") && (
+          <div className="space-y-5">
             {[{ label: "Main Video", setter: setMainVideo, file: mainVideo }, { label: "Clip Video", setter: setClipVideo, file: clipVideo }].map(({ label, setter, file }) => (
-              <div
-                key={label}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleDrop(e, setter)}
-                className="bg-white/30 border-2 border-dashed border-[#EF2850] rounded-xl p-6 text-center cursor-pointer hover:bg-white/40 transition"
-              >
-                <label className="cursor-pointer block">
-                  <p className="mb-3 font-semibold text-white">Drop {label} Here or Click to Upload</p>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => setter(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                  <div className="bg-white text-black px-4 py-2 rounded border inline-block">Select File</div>
-                </label>
-                {file && <p className="text-sm mt-3 text-white">✅ {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
-                <p className="text-xs text-gray-300 mt-2">Max Size: {fileLimitMB}MB</p>
+              <div key={label} className="bg-white/20 rounded-xl p-5 border border-[#EF2850]/30">
+                <p className="text-white font-semibold mb-2">{label}</p>
+                <input type="file" accept="video/*" onChange={(e) => setter(e.target.files?.[0] || null)} className="block w-full" />
+                {file && <p className="text-sm mt-2 text-white/80">✅ {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
               </div>
             ))}
 
@@ -124,7 +103,7 @@ export default function Home() {
               placeholder="Start Timestamp (e.g. 00:01:30)"
               value={startTimestamp}
               onChange={(e) => setStartTimestamp(e.target.value)}
-              className="bg-white border border-[#C5D143] text-black p-4 rounded w-full"
+              className="bg-white/20 text-white placeholder-white/60 px-4 py-3 rounded-xl w-full"
             />
 
             <input
@@ -132,13 +111,13 @@ export default function Home() {
               placeholder="End Timestamp (e.g. 00:02:00)"
               value={endTimestamp}
               onChange={(e) => setEndTimestamp(e.target.value)}
-              className="bg-white border border-[#C5D143] text-black p-4 rounded w-full"
+              className="bg-white/20 text-white placeholder-white/60 px-4 py-3 rounded-xl w-full"
             />
 
             <select
               value={resolution}
               onChange={(e) => setResolution(e.target.value)}
-              className="bg-white border border-[#C5D143] text-black p-4 rounded w-full mb-6"
+              className="bg-white/20 text-white px-4 py-3 rounded-xl w-full"
             >
               <option value="mobile">9:16 (Mobile Portrait)</option>
               <option value="hd">16:9 (HD Landscape)</option>
@@ -148,83 +127,75 @@ export default function Home() {
             <button
               onClick={handleSubmit}
               disabled={status === "loading"}
-              className="bg-[#EF2850] text-white px-6 py-4 rounded-xl w-full font-semibold hover:bg-pink-700 transition"
+              className="bg-[#EF2850] text-white px-6 py-4 rounded-xl w-full font-bold hover:bg-pink-700 transition"
             >
-              Submit
+              SUBMIT
             </button>
           </div>
         )}
 
         {status === "loading" && (
-          <div className="text-center mt-12">
-            <div className="bg-white/20 p-6 rounded-xl">
-              <Lottie animationData={loadingAnimation} className="w-48 mx-auto" loop />
-              <div className="bg-gray-700 mt-6 h-4 rounded-full overflow-hidden">
-                <div
-                  className="bg-[#EF2850] h-full"
-                  style={{ width: `${progress}%`, transition: "width 0.5s" }}
-                ></div>
-              </div>
-              <p className="mt-2 text-sm text-white">Processing... {progress}%</p>
+          <div className="text-center py-16">
+            <Lottie animationData={loadingAnimation} className="w-40 mx-auto" loop />
+            <div className="bg-gray-700 mt-6 h-4 rounded-full overflow-hidden">
+              <div
+                className="bg-[#EF2850] h-full"
+                style={{ width: `${progress}%`, transition: "width 0.5s" }}
+              ></div>
             </div>
+            <p className="mt-2 text-sm text-white/80">Processing... {progress}%</p>
           </div>
         )}
 
         {status === "success" && (
           <div className="mt-8 text-center">
-            <div className="bg-white/20 p-6 rounded-xl">
-              <Lottie animationData={successAnimation} className="w-48 mx-auto" loop={false} />
-
-              <div
-                className={`
-                  mx-auto mt-6 rounded-xl overflow-hidden
-                  ${resolution === "mobile" ? "aspect-[9/16]" : ""}
-                  ${resolution === "square" ? "aspect-square" : ""}
-                  ${resolution === "hd" ? "aspect-video" : ""}
-                `}
-              >
-                <video
-                  src={outputUrl}
-                  controls
-                  className="w-full h-full object-contain"
-                />
-              </div>
-
-              <a
-                href={outputUrl}
-                download
-                target="_blank"
-                className="text-[#EF2850] underline block mt-4"
-              >
-                ⬇️ Download or View Final Video
-              </a>
+            <Lottie animationData={successAnimation} className="w-40 mx-auto" loop={false} />
+            <div className={`mx-auto mt-6 rounded-xl overflow-hidden ${
+              resolution === "mobile" ? "aspect-[9/16]" :
+              resolution === "square" ? "aspect-square" :
+              "aspect-video"
+            }`}>
+              <video src={outputUrl} controls className="w-full h-full object-contain" />
             </div>
+            <a
+              href={outputUrl}
+              download
+              target="_blank"
+              className="text-[#EF2850] underline block mt-4"
+            >
+              ⬇️ Download or View Final Video
+            </a>
           </div>
         )}
 
         {status === "error" && (
           <div className="mt-8 text-center">
-            <div className="bg-white/20 p-6 rounded-xl">
-              <Lottie animationData={errorAnimation} className="w-48 mx-auto" loop={false} />
-              <p className="text-red-500 mt-4">Something went wrong. Please try again.</p>
-              <button
-                onClick={() => {
-                  setStatus("idle");
-                  setMainVideo(null);
-                  setClipVideo(null);
-                  setStartTimestamp("");
-                  setEndTimestamp("");
-                  setOutputUrl("");
-                  setProgress(0);
-                }}
-                className="mt-4 bg-[#EF2850] text-white px-4 py-2 rounded hover:bg-pink-700"
-              >
-                🔁 Start Over
-              </button>
-            </div>
+            <Lottie animationData={errorAnimation} className="w-40 mx-auto" loop={false} />
+            <p className="text-red-400 mt-4">Something went wrong. Please try again.</p>
+            <button
+              onClick={() => {
+                setStatus("idle");
+                setMainVideo(null);
+                setClipVideo(null);
+                setStartTimestamp("");
+                setEndTimestamp("");
+                setOutputUrl("");
+                setProgress(0);
+              }}
+              className="mt-4 bg-[#EF2850] text-white px-4 py-2 rounded hover:bg-pink-700"
+            >
+              🔁 Start Over
+            </button>
           </div>
         )}
       </div>
+
+      <style jsx>{`
+        @keyframes backgroundMove {
+          0% { background-position: 0% 0%; }
+          100% { background-position: 100% 100%; }
+        }
+      `}</style>
     </div>
   );
 }
