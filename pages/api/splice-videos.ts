@@ -3,17 +3,16 @@ import formidable from "formidable";
 import path from "path";
 import fs from "fs/promises";
 import fsSync from "fs";
-import { uploadToS3, deleteFromS3 } from "../../lib/s3Uploader";
+import { uploadToS3 } from "../../lib/s3Uploader";
+import { extractSegment, extractAudio } from "../../lib/ffmpegUtils";
 import ffmpeg from "fluent-ffmpeg";
 
-// Disable built-in bodyParser so formidable can parse multipart/form-data
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-// Get video duration using FFmpeg
 function getVideoDuration(filePath: string): Promise<number> {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
@@ -23,7 +22,6 @@ function getVideoDuration(filePath: string): Promise<number> {
   });
 }
 
-// Convert HH:MM:SS or MM:SS to seconds
 function parseTimeToSeconds(timeStr: string): number {
   const parts = timeStr.split(":").map(Number);
   if (parts.length === 3) {
@@ -57,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const clipVideo = files.clipVideo?.[0];
       const startTimestamp = fields.startTimestamp?.[0];
       const endTimestamp = fields.endTimestamp?.[0];
-      const resolution = fields.resolution?.[0] || "mobile"; // mobile | hd | square
+      const resolution = fields.resolution?.[0] || "mobile";
 
       if (!mainVideo || !clipVideo || !startTimestamp || !endTimestamp) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -65,51 +63,93 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const startSec = parseTimeToSeconds(startTimestamp);
       const endSec = parseTimeToSeconds(endTimestamp);
-      const clipDuration = Math.max(endSec - startSec, 1); // Ensure positive length
-
-      // Get full duration of the main video
       const totalMainDuration = await getVideoDuration(mainVideo.filepath);
-      const remainingDuration = Math.max(totalMainDuration - endSec, 1); // At least 1s
+      const actualClipDuration = await getVideoDuration(clipVideo.filepath);
 
-      // Upload videos to S3
-      const mainUrl = await uploadToS3(mainVideo.filepath, "main");
-      const clipUrl = await uploadToS3(clipVideo.filepath, "clip");
+      const clipDuration = Math.max(actualClipDuration, 0.1); // fallback just in case
+      const remainingDuration = Math.max(totalMainDuration - endSec, 1);
 
-      // Build the Shotstack timeline
+      console.log({
+        startSec,
+        endSec,
+        actualClipDuration,
+        calculatedAfterStart: startSec + clipDuration,
+        remainingDuration
+      });
+
+      // Cut main video into two pre-trimmed segments
+      // Extract audio from main video (full track)
+      const audioPath = await extractAudio(mainVideo.filepath);
+
+      // Slice main video
+      const beforePath = await extractSegment(mainVideo.filepath, 0, startSec);
+      const afterPath = await extractSegment(mainVideo.filepath, endSec, remainingDuration);
+
+      // Upload video segments
+      const beforeUrl = await uploadToS3(beforePath, `before-${Date.now()}`);
+      const afterUrl = await uploadToS3(afterPath, `after-${Date.now()}`);
+      const clipUrl = await uploadToS3(clipVideo.filepath, `clip-${Date.now()}`);
+
+      // Upload audio
+      const audioUrl = await uploadToS3(audioPath, `audio-${Date.now()}`);
+
       const shotstackPayload = {
         timeline: {
           tracks: [
             {
               clips: [
-                // 1) Pre-splice segment
                 {
-                  asset: { type: "video", src: mainUrl },
+                  asset: {
+                    type: "video",
+                    src: beforeUrl,
+                    volume: 0
+                  },
                   start: 0,
-                  length: startSec,       // how long to play this first segment
+                  length: startSec
                 },
-                // 2) The inserted clip
                 {
-                  asset: { type: "video", src: clipUrl },
-                  start: startSec,                        // place at splice point
-                  length: clipDuration > 0 ? clipDuration : 1, 
+                  asset: {
+                    type: "video",
+                    src: clipUrl,
+                    volume: 0
+                  },
+                  start: startSec,
+                  length: clipDuration
                 },
-                // 3) Post-splice continuation of main video
                 {
-                  asset: { type: "video", src: mainUrl },
-                  start: endSec,                          // place at end of clip
-                  length: remainingDuration,              // play from endSec → end
-                },
-              ],
+                  asset: {
+                    type: "video",
+                    src: afterUrl,
+                    volume: 0
+                  },
+                  start: startSec + clipDuration,
+                  length: remainingDuration
+                }
+              ]
             },
-          ],
+            {
+              clips: [
+                {
+                  asset: {
+                    type: "audio",
+                    src: audioUrl
+                  },
+                  start: 0,
+                  length: totalMainDuration
+                }
+              ]
+            }
+          ]
         },
         output: {
           format: "mp4",
-          resolution, // dynamically passed in from the form
-        },
+          resolution,
+          aspectRatio:
+            resolution === "mobile" ? "9:16"
+            : resolution === "square" ? "1:1"
+            : "16:9"
+        }
       };
-
-      // Call Shotstack render API
       const response = await fetch("https://api.shotstack.io/stage/render", {
         method: "POST",
         headers: {
@@ -121,17 +161,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const result = await response.json();
       console.log("📦 Shotstack API Response:", JSON.stringify(result, null, 2));
-      console.log("🎥 Render Resolution:", resolution);
+
+      // Clean up
+      const allFiles = [
+        mainVideo.filepath,
+        clipVideo.filepath,
+        beforePath,
+        afterPath
+      ];
+      await Promise.all(
+        allFiles.map(file => fsSync.existsSync(file) && fs.unlink(file))
+      );
 
       if (!response.ok || !result?.response?.id) {
         return res.status(500).json({ error: "Video rendering failed", shotstackResponse: result });
       }
 
-      // Clean up local temp files
-      if (fsSync.existsSync(mainVideo.filepath)) await fs.unlink(mainVideo.filepath);
-      if (fsSync.existsSync(clipVideo.filepath)) await fs.unlink(clipVideo.filepath);
-
       return res.status(200).json({ id: result.response.id });
+
     } catch (error) {
       console.error("Splicing error:", error);
       return res.status(500).json({ error: "Splicing failed" });
