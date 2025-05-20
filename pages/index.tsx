@@ -4,10 +4,12 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
+import Image from "next/image";
 
 import successAnimation from "../public/animations/success.json";
 import errorAnimation from "../public/animations/error.json";
 import loadingAnimation from "../public/animations/loading.json";
+import logo from "../public/logo.svg";
 
 export default function Home() {
   const [mainVideo, setMainVideo] = useState<File | null>(null);
@@ -86,7 +88,16 @@ export default function Home() {
       <div className="absolute inset-0 z-0 animate-[backgroundMove_30s_linear_infinite] bg-gradient-to-br from-black via-gray-900 to-black bg-[length:400%_400%]" />
 
       <div className="relative z-10 w-full max-w-2xl rounded-3xl bg-white/10 backdrop-blur-xl shadow-[0_0_60px_rgba(255,255,255,0.05)] p-8">
-        <h1 className="text-4xl font-extrabold text-[#EF2850] text-center mb-8 tracking-tight">VIDEO SPLICER</h1>
+      <div className="flex justify-center mb-8">
+        <Image
+          src={logo}
+          alt="App Logo"
+          width={200}
+          height={48}
+          className="h-12 w-auto"
+          priority
+        />
+      </div>
 
         {(status === "idle" || status === "error") && (
           <div className="space-y-5">
@@ -129,7 +140,7 @@ export default function Home() {
               disabled={status === "loading"}
               className="bg-[#EF2850] text-white px-6 py-4 rounded-xl w-full font-bold hover:bg-pink-700 transition"
             >
-              SUBMIT
+              SPLICE
             </button>
           </div>
         )}
